@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Reo AI</title>
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<style>
+:root{--bg:#0f1115;--panel:#161922;--panel2:#1d212c;--line:#2a2f3c;--text:#e8eaf0;--sub:#9aa1b2;--acc:#7c9cff;--acc2:#b48cff;--ok:#5fd3a4;--err:#ff7a7a}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Segoe UI",sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+#app{display:flex;height:100dvh}
+aside{width:260px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
+aside .top{padding:14px;display:flex;gap:8px;align-items:center}
+.logo{font-weight:800;font-size:18px;background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;color:transparent;flex:1}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.btn:hover{border-color:var(--acc)}
+.btn.pri{background:linear-gradient(90deg,var(--acc),var(--acc2));border:none;color:#fff;font-weight:700}
+#chatList{flex:1;overflow:auto;padding:0 8px}
+.ci{display:flex;align-items:center;gap:6px;padding:9px 10px;border-radius:9px;color:var(--sub);font-size:14px;cursor:pointer}
+.ci:hover,.ci.on{background:var(--panel2);color:var(--text)}
+.ci span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ci .x{opacity:0;background:none;border:none;color:var(--sub)}.ci:hover .x{opacity:1}
+aside .bot{padding:12px;border-top:1px solid var(--line);display:flex;gap:8px}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+#menuBtn{display:none}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:none;background:none;padding:6px 14px;border-radius:999px;color:var(--sub);font-size:14px}
+.seg button.on{background:var(--panel2);color:var(--text)}
+#prov{margin-left:auto;font-size:12px;color:var(--sub)}
+#msgs{flex:1;overflow:auto;padding:20px 16px 8px}
+.wrap{max-width:820px;margin:0 auto}
+.m{margin:0 0 18px;display:flex}
+.m.user{justify-content:flex-end}
+.m.user .b{background:var(--panel2);border:1px solid var(--line);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:85%;white-space:pre-wrap;word-break:break-word}
+.m.ai .b{max-width:100%;line-height:1.75;word-break:break-word}
+.b p{margin:.4em 0}.b h1,.b h2,.b h3{margin:.8em 0 .3em;font-size:1.08em}
+.b a{color:var(--acc)}.b ul,.b ol{padding-left:1.4em;margin:.3em 0}
+.b code{background:#232836;padding:1px 5px;border-radius:5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
+.cb{background:#0b0d12;border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden}
+.cb .h{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#141821;font-size:12px;color:var(--sub)}
+.cb .h span{flex:1}.cb .h button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:12px}
+.cb pre{margin:0;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.55}.cb pre code{background:none;padding:0}
+.tool{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin:0 6px 6px 0}
+.dots span{display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:var(--sub);animation:bl 1.2s infinite}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.err{color:var(--err)}
+.empty{text-align:center;color:var(--sub);margin-top:12vh}
+.empty h2{color:var(--text);font-size:26px;margin-bottom:6px}
+.sugs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px}
+.sugs button{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px;color:var(--text)}
+footer{padding:10px 16px calc(12px + env(safe-area-inset-bottom))}
+.inp{max-width:820px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:8px}
+.inp:focus-within{border-color:var(--acc)}
+textarea{flex:1;background:none;border:none;color:var(--text);font:inherit;resize:none;outline:none;max-height:200px;padding:6px 4px;font-size:15px}
+.ib{width:38px;height:38px;border-radius:12px;border:none;background:var(--panel2);display:grid;place-items:center;flex-shrink:0}
+#send{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
+#mic.rec{background:var(--err);color:#fff}
+#att{position:relative}#attPrev{max-width:820px;margin:0 auto 6px;display:none;align-items:center;gap:8px}#attPrev.on{display:flex}
+#attPrev img{height:64px;border-radius:10px;border:1px solid var(--line)}#attPrev button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12px}
+.m.user .b img{display:block;max-width:240px;max-height:240px;border-radius:10px;margin-bottom:6px}
+.think{font-size:12px;color:var(--sub);margin-bottom:6px}
+.cursor::after{content:'▍';animation:bl 1s infinite;color:var(--acc)}
+.gstat{font-size:12px;margin-top:6px}
+.drop{outline:2px dashed var(--acc);outline-offset:-8px}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal.on{display:flex}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:560px;max-height:90dvh;overflow:auto;padding:20px}
+.card h3{margin:0 0 12px}.card label{display:block;font-size:13px;color:var(--sub);margin:14px 0 6px}
+.card input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font:inherit}
+.small{font-size:12px;color:var(--sub);line-height:1.6}
+.memi{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.memi span{flex:1}
+.memi button{background:none;border:none;color:var(--sub)}
+#preview .card{max-width:1000px;height:85dvh;display:flex;flex-direction:column;padding:12px}
+#preview iframe{flex:1;border:none;border-radius:10px;background:#fff}
+@media(max-width:760px){aside{position:fixed;inset:0 auto 0 0;z-index:40;transform:translateX(-100%);transition:.2s}aside.open{transform:none}#menuBtn{display:grid}.seg button{padding:6px 10px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="top"><div class="logo">✦ Reo AI</div><button class="btn" onclick="newChat()">＋ 新規</button></div>
+    <div id="chatList"></div>
+    <div class="bot"><button class="btn" style="flex:1" onclick="openSettings()">⚙ 設定・記憶</button></div>
+  </aside>
+  <main>
+    <header>
+      <button id="menuBtn" class="ib" onclick="side.classList.toggle('open')">☰</button>
+      <div class="seg"><button id="mAuto" class="on" onclick="setMode('auto')">💬 日常</button><button id="mCode" onclick="setMode('code')">⌨ コード</button></div>
+      <div id="prov"></div>
+    </header>
+    <div id="msgs"><div class="wrap" id="wrap"></div></div>
+    <footer>
+      <div id="attPrev"><img id="attImg"><button onclick="clearAtt()">✕ 画像を外す</button></div>
+      <div class="inp">
+        <input type="file" id="fileIn" accept="image/*" hidden onchange="pickFile(this.files[0]);this.value=''">
+        <button class="ib" id="att" title="画像を添付" onclick="fileIn.click()">📎</button>
+        <button class="ib" id="mic" title="音声入力" onclick="toggleMic()">🎤</button>
+        <textarea id="q" rows="1" placeholder="なんでも聞いてください（画像は📎・貼り付け・ドロップ）"></textarea>
+        <button class="ib" id="send" onclick="send()">➤</button>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<div class="modal" id="passM"><div class="card">
+  <h3>✦ Reo AI へようこそ</h3>
+  <p class="small">合言葉を入力してください（この端末に保存されます）。</p>
+  <input id="passIn" type="password" placeholder="合言葉" onkeydown="if(event.key==='Enter')savePass()">
+  <div style="margin-top:14px;text-align:right"><button class="btn pri" onclick="savePass()">はじめる</button></div>
+  <p id="passErr" class="small err"></p>
+</div></div>
+
+<div class="modal" id="setM" onclick="if(event.target===this)this.classList.remove('on')"><div class="card">
+  <h3>⚙ 設定</h3>
+  <label>Gemini APIキー（任意・無料で取得可）</label>
+  <input id="gk" type="password" placeholder="未設定ならCloudflare Workers AIを使います">
+  <p class="small">Google AI Studio（aistudio.google.com）で無料発行できます。キーはこの端末のブラウザにだけ保存され、使うときだけサーバー経由でGoogleに送られます。</p>
+  <label>Google連携（カレンダー・Gmail）</label>
+  <p class="small">あなたのGoogleアカウントで動く無料のApps Scriptを経由します（メール送信はせず、下書き作成まで）。<br>
+  ① <button class="btn" style="padding:3px 8px;font-size:12px" onclick="copyGas(this)">スクリプトをコピー</button>（合言葉入り）<br>
+  ② script.google.com →「新しいプロジェクト」に貼り付けて保存<br>
+  ③「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」／実行ユーザー「自分」／アクセス「全員」→ デプロイして承認<br>
+  ④ 表示された …/exec のURLを下に貼って「接続テスト」</p>
+  <div style="display:flex;gap:8px"><input id="gasIn" placeholder="https://script.google.com/macros/s/…/exec"><button class="btn" onclick="testGas()">接続テスト</button></div>
+  <div id="gasStat" class="gstat small"></div>
+  <label>覚えていること（AIが会話から自動で保存します）</label>
+  <div id="memList"></div>
+  <div style="display:flex;gap:8px;margin-top:10px"><input id="memIn" placeholder="手動で追加（例：朝はコーヒー派）"><button class="btn" onclick="addMem()">追加</button></div>
+  <label>端末ID（別の端末で同じ記憶を使うときに入力）</label>
+  <input id="uidIn">
+  <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn" onclick="logout()">合言葉をリセット</button>
+    <button class="btn pri" onclick="saveSettings()">保存</button>
+  </div>
+</div></div>
+
+<div class="modal" id="preview" onclick="if(event.target===this)this.classList.remove('on')"><div class="card">
+  <div style="display:flex;align-items:center;margin-bottom:8px"><b style="flex:1">▶ プレビュー</b><button class="btn" onclick="preview.classList.remove('on');pf.srcdoc=''">閉じる</button></div>
+  <iframe id="pf" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+</div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const LS=localStorage;
+let uid=LS.uid||(LS.uid='u'+crypto.randomUUID().replace(/-/g,'').slice(0,20));
+let pass=LS.pass||'';let mode='auto';let chat=null;let busy=false;
+let gasToken=LS.gasToken||(LS.gasToken=[...crypto.getRandomValues(new Uint8Array(18))].map(b=>b.toString(16).padStart(2,'0')).join(''));
+const H=()=>({'content-type':'application/json','x-pass':pass,'x-uid':uid,...(LS.gk?{'x-gemini-key':LS.gk}:{}),...(LS.gasUrl?{'x-gas-url':LS.gasUrl,'x-gas-token':gasToken}:{})});
+async function api(path,opt={}){const r=await fetch(path,{...opt,headers:H()});if(r.status===401){showPass('合言葉が違います');throw new Error('pass')}return r.json()}
+function showPass(e){$('#passErr').textContent=e||'';passM.classList.add('on');setTimeout(()=>passIn.focus(),50)}
+async function savePass(){pass=passIn.value.trim();try{await api('/api/ping');LS.pass=pass;passM.classList.remove('on');init()}catch{}}
+function logout(){LS.removeItem('pass');location.reload()}
+function updProv(){prov.textContent=(LS.gk?'🧠 Gemini 2.5 Flash':'🧠 Qwen3 30B（Workers AI）')+(LS.gasUrl?' · 📅 Google連携中':'')}
+function setMode(m){mode=m;mAuto.classList.toggle('on',m==='auto');mCode.classList.toggle('on',m==='code');updProv()}
+
+// --- markdown ---
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let codeStore=[];
+function inline(s){return esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>')}
+function md(src){
+  const parts=src.split(/```/);let out='';
+  parts.forEach((p,i)=>{
+    if(i%2){const nl=p.indexOf('\n');const lang=(nl>=0?p.slice(0,nl):'').trim().toLowerCase();const code=nl>=0?p.slice(nl+1):p;const id=codeStore.push({lang,code})-1;
+      const runnable=['html','js','javascript','svg'].includes(lang)||(!lang&&/<\w+[\s>]/.test(code));
+      out+=`<div class="cb"><div class="h"><span>${esc(lang||'code')}</span><button onclick="copyCode(${id},this)">コピー</button>${runnable?`<button onclick="runCode(${id})">▶ 実行</button>`:''}</div><pre><code>${esc(code.replace(/\n$/,''))}</code></pre></div>`;return}
+    let list=null;
+    for(const line of p.split('\n')){
+      let m;
+      if(m=line.match(/^\s*[-*・]\s+(.*)/)){if(list!=='ul'){if(list)out+=`</${list}>`;out+='<ul>';list='ul'}out+=`<li>${inline(m[1])}</li>`;continue}
+      if(m=line.match(/^\s*\d+[.)]\s+(.*)/)){if(list!=='ol'){if(list)out+=`</${list}>`;out+='<ol>';list='ol'}out+=`<li>${inline(m[1])}</li>`;continue}
+      if(list){out+=`</${list}>`;list=null}
+      if(m=line.match(/^(#{1,4})\s+(.*)/)){out+=`<h3>${inline(m[2])}</h3>`;continue}
+      if(line.trim())out+=`<p>${inline(line)}</p>`;
+    }
+    if(list)out+=`</${list}>`;
+  });return out}
+function copyCode(id,b){navigator.clipboard.writeText(codeStore[id].code);b.textContent='✓ コピー済';setTimeout(()=>b.textContent='コピー',1500)}
+function runCode(id){const {lang,code}=codeStore[id];let doc=code;
+  if(lang==='js'||lang==='javascript'){doc=`<body style="font-family:monospace;padding:12px"><pre id=o></pre><script>const o=document.getElementById('o');const lg=(...a)=>o.textContent+=a.map(x=>typeof x==='object'?JSON.stringify(x,null,2):String(x)).join(' ')+'\\n';console.log=lg;console.error=(...a)=>lg('❌',...a);window.onerror=(m)=>lg('❌',m);<\/script><script>${code.replace(/<\/script>/g,'<\\/script>')}<\/script></body>`}
+  pf.srcdoc=doc;preview.classList.add('on')}
+
+// --- chats ---
+function newChat(){chat={id:'c'+Date.now(),title:'新しい会話',messages:[]};render();renderList();side.classList.remove('open');q.focus()}
+async function renderList(){try{const l=await api('/api/chats');chatList.innerHTML=l.map(c=>`<div class="ci ${chat&&c.id===chat.id?'on':''}" onclick="openChat('${c.id}')"><span>${esc(c.title)}</span><button class="x" onclick="event.stopPropagation();delChat('${c.id}')">✕</button></div>`).join('')}catch{}}
+async function openChat(id){const m=await api('/api/chats?id='+id);const t=[...chatList.querySelectorAll('.ci')].find(e=>e.onclick.toString().includes(id));chat={id,title:t?t.textContent.replace('✕',''):'会話',messages:m||[]};render();renderList();side.classList.remove('open')}
+async function delChat(id){if(!confirm('この会話を削除しますか？'))return;await api('/api/chats?id='+id,{method:'DELETE'});if(chat&&chat.id===id)newChat();else renderList()}
+async function saveChat(){await api('/api/chats',{method:'POST',body:JSON.stringify(chat)});renderList()}
+const SUGS=['今日のニュースを3つ教えて','明日の予定は？','1週間の夕飯の献立を考えて','ToDoアプリをHTML1枚で作って','Pythonでフォルダ内の画像を一括リサイズしたい','私は朝型でコーヒー好き。覚えておいて'];
+function render(){codeStore=[];
+  if(!chat.messages.length){wrap.innerHTML=`<div class="empty"><h2>何をしましょう？</h2><div>日常の相談から、調べもの、コーディングまで。</div><div class="sugs">${SUGS.map(s=>`<button onclick="q.value=this.textContent;send()">${s}</button>`).join('')}</div></div>`;return}
+  wrap.innerHTML=chat.messages.map(m=>`<div class="m ${m.role==='user'?'user':'ai'}"><div class="b">${m.role==='user'?(m.thumb?`<img src="${m.thumb}">`:'')+esc(m.content):(m.tools||'')+md(m.content)}</div></div>`).join('');msgs.scrollTop=msgs.scrollHeight}
+const TN={web_search:'🔎 検索',fetch_url:'📄 ページを読む',remember:'🧠 記憶',calendar_events:'📅 予定を確認',calendar_create:'📅 予定を追加',gmail_search:'✉️ メール検索',gmail_read:'✉️ メールを読む',gmail_draft:'📝 下書き作成'};
+let att=null; // {full, thumb}
+function resizeImg(file,max,q){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',q))};img.onerror=rej;img.src=URL.createObjectURL(file)})}
+async function pickFile(f){if(!f||!f.type.startsWith('image/'))return;att={full:await resizeImg(f,1280,.85),thumb:await resizeImg(f,320,.7)};attImg.src=att.thumb;attPrev.classList.add('on');q.focus()}
+function clearAtt(){att=null;attPrev.classList.remove('on')}
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it){e.preventDefault();pickFile(it.getAsFile())}});
+document.addEventListener('dragover',e=>{e.preventDefault();document.body.classList.add('drop')});
+document.addEventListener('dragleave',e=>{if(!e.relatedTarget)document.body.classList.remove('drop')});
+document.addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('drop');const f=e.dataTransfer.files[0];if(f)pickFile(f)});
+async function send(){
+  const text=q.value.trim();if((!text&&!att)||busy)return;if(!chat)newChat();
+  busy=true;q.value='';autoH();
+  const um={role:'user',content:text||'この画像について教えて'};const img=att;if(img)um.thumb=img.thumb;clearAtt();
+  chat.messages.push(um);if(chat.title==='新しい会話')chat.title=(text||'画像の質問').slice(0,30);
+  render();
+  const el=document.createElement('div');el.className='m ai';el.innerHTML='<div class="b"><div class="tl"></div><div class="think"></div><div class="body"><div class="dots"><span></span><span></span><span></span></div></div></div>';wrap.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
+  const tl=el.querySelector('.tl'),th=el.querySelector('.think'),bd=el.querySelector('.body');let tools='';let answer='';let live='';let raf=0;
+  const paint=()=>{raf=0;codeStore=codeStore.slice(0,0);bd.innerHTML=md(live);bd.classList.add('cursor');const nearBottom=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<160;if(nearBottom)msgs.scrollTop=msgs.scrollHeight};
+  const payload=chat.messages.map((m,i)=>i===chat.messages.length-1&&img?{...m,image:img.full}:{role:m.role,content:m.content,thumb:m.thumb?1:undefined});
+  try{
+    const r=await fetch('/api/chat',{method:'POST',headers:H(),body:JSON.stringify({messages:payload,mode})});
+    if(r.status===401){showPass('合言葉が違います');throw new Error('合言葉')}
+    const rd=r.body.getReader();const dec=new TextDecoder();let buf='';
+    while(true){const {value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+      let i;while((i=buf.indexOf('\n\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+2);if(!line.startsWith('data: '))continue;const ev=JSON.parse(line.slice(6));
+        if(ev.type==='thinking'&&!live)th.textContent='💭 考え中…';
+        if(ev.type==='delta'){th.textContent='';live+=ev.text;if(!raf)raf=requestAnimationFrame(paint)}
+        if(ev.type==='reset'){live='';bd.innerHTML='<div class="dots"><span></span><span></span><span></span></div>'}
+        if(ev.type==='tool'){th.textContent='';let a=ev.args;if(typeof a==='string'){try{a=JSON.parse(a)}catch{}}const d=a&&(a.query||a.url||a.fact||a.title||a.subject||a.start)||'';tools+=`<span class="tool">${TN[ev.name]||ev.name} ${esc(String(d).slice(0,40))}</span>`;tl.innerHTML=tools;msgs.scrollTop=msgs.scrollHeight}
+        if(ev.type==='text')answer=ev.text;
+        if(ev.type==='error')answer='⚠️ エラー: '+ev.message+(LS.gk?'\n\nGeminiキーを確認するか、設定でキーを外すとWorkers AIに切り替わります。':'');
+      }}
+  }catch(e){answer=answer||live||'⚠️ 通信エラー: '+e.message}
+  chat.messages.push({role:'assistant',content:answer||live,tools:tools?`<div>${tools}</div>`:''});
+  render();busy=false;saveChat();
+}
+q.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
+function autoH(){q.style.height='auto';q.style.height=Math.min(q.scrollHeight,200)+'px'}q.addEventListener('input',autoH);
+
+// --- voice ---
+let rec=null;
+function toggleMic(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('このブラウザは音声入力に未対応です（Chrome/Safari推奨）');return}
+  if(rec){rec.stop();return}rec=new SR();rec.lang='ja-JP';rec.interimResults=true;const base=q.value;
+  rec.onresult=e=>{q.value=base+[...e.results].map(r=>r[0].transcript).join('');autoH()};
+  rec.onend=()=>{mic.classList.remove('rec');rec=null};mic.classList.add('rec');rec.start()}
+
+// --- settings ---
+async function openSettings(){gasIn.value=LS.gasUrl||'';gasStat.textContent=LS.gasUrl?'✅ 接続済み':'';gk.value=LS.gk||'';uidIn.value=uid;setM.classList.add('on');side.classList.remove('open');loadMem()}
+async function loadMem(){const l=await api('/api/memories');memList.innerHTML=l.length?l.map(m=>`<div class="memi"><span>${esc(m.text)}</span><button onclick="delMem(${m.id})">✕</button></div>`).join(''):'<p class="small">まだありません</p>'}
+async function addMem(){if(!memIn.value.trim())return;await api('/api/memories',{method:'POST',body:JSON.stringify({text:memIn.value})});memIn.value='';loadMem()}
+async function delMem(id){await api('/api/memories?id='+id,{method:'DELETE'});loadMem()}
+async function copyGas(b){const t=await (await fetch('/gas.js')).text();await navigator.clipboard.writeText(t.replace('__TOKEN__',gasToken));b.textContent='✓ コピーしました'}
+async function testGas(){const u=gasIn.value.trim();if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)){gasStat.innerHTML='<span class="err">…/exec で終わるウェブアプリのURLを貼ってください</span>';return}
+  gasStat.textContent='テスト中…';const old=LS.gasUrl;LS.gasUrl=u;
+  try{const r=await api('/api/gastest');if(r.ok){gasStat.textContent='✅ 接続OK: '+(r.email||'Googleアカウント');updProv()}else{if(old)LS.gasUrl=old;else LS.removeItem('gasUrl');gasStat.innerHTML='<span class="err">❌ '+esc(r.error||'失敗')+(r.error==='token mismatch'?'（スクリプトをコピーし直して貼り替え、再デプロイしてください）':'')+'</span>'}}catch(e){gasStat.innerHTML='<span class="err">❌ '+esc(e.message)+'</span>'}}
+function saveSettings(){if(!gasIn.value.trim()){LS.removeItem('gasUrl')}const k=gk.value.trim();if(k)LS.gk=k;else LS.removeItem('gk');const u=uidIn.value.trim().replace(/[^a-zA-Z0-9_-]/g,'');if(u&&u!==uid){LS.uid=uid=u;newChat()}setM.classList.remove('on');updProv()}
+
+function init(){updProv();newChat()}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
+if(!pass)showPass();else api('/api/ping').then(init).catch(()=>{});
+</script>
+</body>
+</html>
