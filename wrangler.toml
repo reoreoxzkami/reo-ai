@@ -1,0 +1,19 @@
+name = "reo-ai"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+
+[ai]
+binding = "AI"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "YOUR_KV_NAMESPACE_ID"   # npx wrangler kv namespace create reo-ai-brain
+
+# legacy class kept for migration compatibility (unused)
+[[durable_objects.bindings]]
+name = "BRAIN"
+class_name = "Brain"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Brain"]
