@@ -1,0 +1,16 @@
+{
+  "name": "reo-ai",
+  "version": "1.0.0",
+  "description": "日常の相談からコーディングまでこなす、**無料で動く**パーソナルAIアシスタント。Cloudflare Workers 1本で動きます。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cloudflare/puppeteer": "^1.4.0",
+    "esbuild": "^0.28.2"
+  }
+}
