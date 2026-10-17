@@ -1,0 +1,6 @@
+.passcode
+.deploy.env
+.vapid*
+src/assets.js
+node_modules/
+.wrangler/
