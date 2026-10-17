@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { ASSETS } from "./assets.js";
+import puppeteer from "@cloudflare/puppeteer";
 
 const MODEL_CHAT = "@cf/qwen/qwen3-30b-a3b-fp8";
 const MODEL_CODE = "@cf/qwen/qwen3-30b-a3b-fp8";
@@ -181,6 +182,98 @@ async function callGas(gas, action, args) {
   } catch (e) { return { error: String(e) }; }
 }
 
+
+// ---------------- Browser (Cloudflare Browser Run) ----------------
+const BROWSER_TOOLS = [
+  { name: "browser_open", description: "Open a URL in a real Chrome browser that you control. Returns the page text and a numbered list of clickable/typeable elements. Use for sites that need clicking, typing, searching or JavaScript (fetch_url is faster for simply reading a static page).", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
+  { name: "browser_click", description: "Click element number [id] from the latest element list.", parameters: { type: "object", properties: { id: { type: "number" } }, required: ["id"] } },
+  { name: "browser_type", description: "Type text into input element number [id]. Set enter=true to press Enter afterwards (e.g. to submit a search).", parameters: { type: "object", properties: { id: { type: "number" }, text: { type: "string" }, enter: { type: "boolean" } }, required: ["id", "text"] } },
+  { name: "browser_scroll", description: "Scroll the page down or up by one screen and get the newly visible elements.", parameters: { type: "object", properties: { direction: { type: "string", enum: ["down", "up"] } }, required: ["direction"] } },
+  { name: "browser_back", description: "Go back to the previous page.", parameters: { type: "object", properties: {} } },
+  { name: "browser_read", description: "Read the full text of the current page (longer than the summary).", parameters: { type: "object", properties: {} } },
+];
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+async function getBrowser(ctx) {
+  if (ctx.bw) return ctx.bw;
+  if (!ctx.env.BROWSER) throw new Error("ブラウザ機能が有効になっていません");
+  if (ctx.browserSession) { try { ctx.bw = await puppeteer.connect(ctx.env.BROWSER, ctx.browserSession); } catch (e) { ctx.bw = null; } }
+  if (!ctx.bw) {
+    try { ctx.bw = await puppeteer.launch(ctx.env.BROWSER, { keep_alive: 180000 }); }
+    catch (e) { throw new Error(/limit|429|quota|time/i.test(String(e)) ? "今日のブラウザ無料枠（1日10分）を使い切ったか、同時起動の上限です。明日また使えます。" : "ブラウザを起動できません: " + String(e.message || e)); }
+  }
+  ctx.browserSession = ctx.bw.sessionId();
+  ctx.emit?.({ type: "browser_session", id: ctx.browserSession });
+  return ctx.bw;
+}
+async function getPage(ctx) {
+  if (ctx.page) return ctx.page;
+  const bw = await getBrowser(ctx);
+  const pages = await bw.pages();
+  ctx.page = pages.find(p => p.url() !== "about:blank") || pages[0] || await bw.newPage();
+  await ctx.page.setViewport({ width: 1100, height: 760 });
+  await ctx.page.setExtraHTTPHeaders({ "accept-language": "ja,en;q=0.8" }).catch(() => {});
+  return ctx.page;
+}
+async function settle(page) {
+  await sleep(600);
+  try { await page.waitForNetworkIdle({ idleTime: 400, timeout: 4000 }); } catch (e) {}
+}
+async function pageState(ctx, full = false) {
+  const page = ctx.page;
+  const info = await page.evaluate((full) => {
+    document.querySelectorAll("[data-reo]").forEach(e => e.removeAttribute("data-reo"));
+    const sel = 'a[href],button,input:not([type=hidden]),textarea,select,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[contenteditable=true],summary,[onclick]';
+    const vh = innerHeight, out = []; let n = 0;
+    for (const el of document.querySelectorAll(sel)) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2 || r.bottom < -50 || r.top > vh * 1.6) continue;
+      const cs = getComputedStyle(el); if (cs.visibility === "hidden" || cs.display === "none") continue;
+      n++; el.setAttribute("data-reo", n);
+      const tag = el.tagName.toLowerCase();
+      let label = (el.innerText || el.value || el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.getAttribute("title") || el.getAttribute("alt") || el.querySelector?.("img")?.alt || "").replace(/\s+/g, " ").trim().slice(0, 70);
+      let extra = tag === "input" ? ` type=${el.type}${el.placeholder ? ' placeholder="' + el.placeholder.slice(0, 40) + '"' : ""}` : "";
+      if (tag === "a") { try { extra += " → " + new URL(el.href).pathname.slice(0, 50); } catch (e) {} }
+      out.push(`[${n}] ${tag}${extra} "${label}"`);
+      if (n >= 90) break;
+    }
+    const text = (document.body?.innerText || "").replace(/\n\s*\n+/g, "\n").slice(0, full ? 9000 : 2500);
+    return { title: document.title, url: location.href, elements: out.join("\n"), text };
+  }, full);
+  try {
+    const shot = await page.screenshot({ type: "jpeg", quality: 55, encoding: "base64" });
+    ctx.emit?.({ type: "screenshot", data: "data:image/jpeg;base64," + shot, url: info.url });
+    ctx.lastShot = shot;
+  } catch (e) {}
+  return info;
+}
+async function runBrowser(name, args, ctx) {
+  try {
+    const page = await getPage(ctx);
+    if (name === "browser_open") {
+      let u = String(args.url || "").trim(); if (!/^https?:\/\//.test(u)) u = "https://" + u;
+      await page.goto(u, { waitUntil: "domcontentloaded", timeout: 25000 }); await settle(page);
+    } else if (name === "browser_click") {
+      const h = await page.$(`[data-reo="${Number(args.id)}"]`);
+      if (!h) return { error: "その番号の要素が見つかりません。最新の一覧を確認してください", ...(await pageState(ctx)) };
+      await h.evaluate(e => { e.scrollIntoView({ block: "center" }); if (e.tagName === "A" && e.target === "_blank") e.target = "_self"; });
+      try { await h.click(); } catch (e) { await h.evaluate(e => e.click()); }
+      await settle(page);
+    } else if (name === "browser_type") {
+      const h = await page.$(`[data-reo="${Number(args.id)}"]`);
+      if (!h) return { error: "その番号の要素が見つかりません", ...(await pageState(ctx)) };
+      await h.click({ clickCount: 3 }).catch(() => {});
+      await h.evaluate(e => { if ("value" in e) e.value = ""; });
+      await h.type(String(args.text || ""), { delay: 15 });
+      if (args.enter) { await page.keyboard.press("Enter"); await settle(page); } else await sleep(300);
+    } else if (name === "browser_scroll") {
+      await page.evaluate(d => scrollBy(0, (d === "up" ? -1 : 1) * innerHeight * 0.85), args.direction); await sleep(500);
+    } else if (name === "browser_back") {
+      await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {}); await settle(page);
+    }
+    return await pageState(ctx, name === "browser_read");
+  } catch (e) { return { error: String(e.message || e) }; }
+}
+
 async function runTool(name, args, ctx) {
   if (typeof args === "string") { try { args = JSON.parse(args); } catch { args = {}; } }
   args = args || {};
@@ -188,6 +281,7 @@ async function runTool(name, args, ctx) {
   if (name === "fetch_url") return await fetchUrl(args.url || "");
   if (name === "remember") { await ctx.brain.addMemory(args.fact || ""); return { saved: true }; }
   if (GOOGLE_TOOLS.some(t => t.name === name)) return await callGas(ctx.gas, name, args);
+  if (name.startsWith("browser_")) return await runBrowser(name, args, ctx);
   return { error: "unknown tool" };
 }
 
@@ -201,6 +295,8 @@ function systemPrompt(memories, mode, hasGoogle) {
 - ユーザーの好み・名前・予定・取り組み中のことなど、今後も役立つ新しい情報を聞いたら remember で保存する（下の「覚えていること」に既にある内容は保存しない）。
 - コードは必ず \`\`\`言語名 のコードブロックで、動く完全なコードを書く。HTML/JSは画面の「▶実行」ボタンでプレビューできる。
 - 画像が添付されたら、よく観察して質問に答える。
+- 本物のブラウザを操作できる（browser_open / browser_click / browser_type / browser_scroll / browser_back / browser_read）。ユーザーが「〜のサイトで…して」「開いて」「検索して操作して」など操作を頼んだときや、JavaScriptが必要なページで使う。結果の要素番号[n]で操作し、1手ずつ画面を確認する。画面はユーザーにもスクショで見えている。
+- ブラウザで購入・支払い・予約確定・投稿・メッセージ送信・個人情報やパスワードの入力をする前には、必ず手を止めてユーザーに確認する。ログインが必要なら、その旨を伝えて止まる。無料枠は1日10分なので、無駄な操作はしない。
 - 知らないことは推測で断定しない。
 ${hasGoogle ? "- Googleカレンダー/Gmailに接続済み。予定やメールの質問は calendar_events / gmail_search / gmail_read で確認してから答える。予定の追加や下書き作成は、ユーザーが頼んだときだけ行い、内容を報告する。メールの送信はできない（下書きのみ）。" : "- Googleカレンダー/Gmailは未接続。聞かれたら設定画面の「Google連携」で接続できると案内する。"}
 ${mode === "code" ? "- 今はコーディングモード。設計→実装→使い方の順で、実用的で正確なコードを優先する。" : ""}
@@ -272,10 +368,10 @@ function toOAIMessages(messages) {
 async function chatWorkersAI(env, ctx, messages, mode, emit) {
   const memories = await ctx.brain.listMemories();
   const hasImage = !!messages[messages.length - 1]?.image;
-  const tools = [...BASE_TOOLS, ...(ctx.gas ? GOOGLE_TOOLS : [])].map(t => ({ type: "function", function: t }));
+  const tools = [...BASE_TOOLS, ...BROWSER_TOOLS, ...(ctx.gas ? GOOGLE_TOOLS : [])].map(t => ({ type: "function", function: t }));
   const msgs = [{ role: "system", content: systemPrompt(memories, mode, !!ctx.gas) }, ...toOAIMessages(messages)];
   const model = hasImage ? MODEL_VISION : (mode === "code" ? MODEL_CODE : MODEL_CHAT);
-  for (let step = 0; step < 6; step++) {
+  for (let step = 0; step < 14; step++) {
     const { text, calls } = await streamStep(env, model, { messages: msgs, tools, max_tokens: 4096 }, emit);
     if (!calls.length) return text;
     emit({ type: "reset" });
@@ -283,6 +379,7 @@ async function chatWorkersAI(env, ctx, messages, mode, emit) {
     for (const c of calls) {
       emit({ type: "tool", name: c.name, args: c.args });
       const res = await runTool(c.name, c.args, ctx);
+      if (c.name.startsWith("browser_")) for (const m of msgs) if (m.role === "tool" && m.name?.startsWith("browser_") && m.content.length > 300) m.content = '{"note":"古い画面の情報は省略。最新の結果を使うこと"}';
       msgs.push({ role: "tool", tool_call_id: c.id, name: c.name, content: JSON.stringify(res).slice(0, 9000) });
     }
   }
@@ -297,8 +394,8 @@ async function chatGemini(key, ctx, messages, mode, emit) {
     if (m.image && i === messages.length - 1) { const mm = m.image.match(/^data:([^;]+);base64,(.*)$/); if (mm) parts.push({ inline_data: { mime_type: mm[1], data: mm[2] } }); }
     return { role: m.role === "assistant" ? "model" : "user", parts };
   });
-  const body = { systemInstruction: { parts: [{ text: systemPrompt(memories, mode, !!ctx.gas) }] }, tools: [{ functionDeclarations: [...BASE_TOOLS, ...(ctx.gas ? GOOGLE_TOOLS : [])] }], contents };
-  for (let step = 0; step < 6; step++) {
+  const body = { systemInstruction: { parts: [{ text: systemPrompt(memories, mode, !!ctx.gas) }] }, tools: [{ functionDeclarations: [...BASE_TOOLS, ...BROWSER_TOOLS, ...(ctx.gas ? GOOGLE_TOOLS : [])] }], contents };
+  for (let step = 0; step < 14; step++) {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`, {
       method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body),
     });
@@ -345,9 +442,10 @@ export default {
     const brain = new KVBrain(env.KV, uid);
     const gasUrl = req.headers.get("x-gas-url") || "";
     const gas = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(gasUrl) ? { url: gasUrl, token: req.headers.get("x-gas-token") || "" } : null;
-    const ctx = { brain, gas };
+    const ctx = { brain, gas, env, browserSession: (req.headers.get("x-browser-session") || "").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 80) || null };
 
     if (p === "/api/ping") return json({ ok: true });
+    if (p === "/api/browser/close" && req.method === "POST") { if (ctx.browserSession && env.BROWSER) { try { const b = await puppeteer.connect(env.BROWSER, ctx.browserSession); await b.close(); } catch (e) {} } return json({ ok: true }); }
     if (p === "/api/gastest") return json(await callGas(gas, "ping", {}));
     if (p === "/api/memories") {
       if (req.method === "GET") return json(await brain.listMemories());
@@ -373,11 +471,13 @@ export default {
       const { readable, writable } = new TransformStream();
       const w = writable.getWriter(); const enc = new TextEncoder();
       const emit = (o) => w.write(enc.encode("data: " + JSON.stringify(o) + "\n\n")).catch(() => {});
+      ctx.emit = emit;
       (async () => {
         try {
           const text = geminiKey ? await chatGemini(geminiKey, ctx, messages, mode, emit) : await chatWorkersAI(env, ctx, messages, mode, emit);
           emit({ type: "text", text: text || "（空の応答でした）", provider: geminiKey ? "Gemini" : "Workers AI" });
         } catch (e) { emit({ type: "error", message: String(e.message || e) }); }
+        if (ctx.bw) { try { ctx.bw.disconnect(); } catch (e) {} }
         emit({ type: "done" }); w.close().catch(() => {});
       })();
       return new Response(readable, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
