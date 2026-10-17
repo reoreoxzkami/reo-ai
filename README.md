@@ -5,6 +5,7 @@
 ## できること
 - 💬 **日常モード** — 相談・調べもの。必要なら自分でWeb検索してページを読み、出典つきで回答
 - ⌨ **コードモード** — 実用的なコードを生成。HTML/JSは「▶ 実行」でその場でプレビュー
+- 🌐 **ブラウザ操作** — 本物のChrome（Cloudflare Browser Run）でページを開き、クリック・入力・スクロール。画面のスクショをチャットに表示。購入や送信の前は必ず確認
 - 🖼 **画像で質問** — 📎・貼り付け・ドラッグ&ドロップで画像を添付（自動で縮小して送信）
 - 📅✉️ **Googleカレンダー・Gmail連携** — 予定の確認/追加、メール検索/本文読み取り/下書き作成（送信はしません）
 - 🧠 **記憶** — 名前や好みを会話から自動保存。設定画面で確認・削除
@@ -30,6 +31,7 @@ build.py        web/ と gas/ を src/assets.js にまとめる
 ## 自分でデプロイ
 ```bash
 npx wrangler kv namespace create reo-ai-brain   # 出たIDを wrangler.toml に記入
+npm install
 python3 build.py
 npx wrangler deploy
 npx wrangler secret put APP_PASSCODE            # 好きな合言葉
@@ -43,6 +45,7 @@ npx wrangler secret put APP_PASSCODE            # 好きな合言葉
 
 ## 無料枠の目安
 - Workers AI: 1日の無料枠（neurons）を超えるとその日は応答が止まります
+- Browser Run: 1日10分・同時3ブラウザまで
 - Workers KV: 書き込み 1日1,000回（会話の保存1回で約2回）
 
 MIT License
