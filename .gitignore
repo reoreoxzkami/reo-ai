@@ -4,3 +4,4 @@
 src/assets.js
 node_modules/
 .wrangler/
+dist/
