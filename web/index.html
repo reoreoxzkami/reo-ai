@@ -45,6 +45,7 @@ header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:
 .cb .h{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#141821;font-size:12px;color:var(--sub)}
 .cb .h span{flex:1}.cb .h button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-size:12px}
 .cb pre{margin:0;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.55}.cb pre code{background:none;padding:0}
+.shot{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:4px 0 10px;max-width:560px;background:var(--panel)}.shotbar{font-size:11px;color:var(--sub);padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.shot img{display:block;width:100%;cursor:zoom-in}
 .tool{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;margin:0 6px 6px 0}
 .dots span{display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:var(--sub);animation:bl 1.2s infinite}
 .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
@@ -151,7 +152,7 @@ const LS=localStorage;
 let uid=LS.uid||(LS.uid='u'+crypto.randomUUID().replace(/-/g,'').slice(0,20));
 let pass=LS.pass||'';let mode='auto';let chat=null;let busy=false;
 let gasToken=LS.gasToken||(LS.gasToken=[...crypto.getRandomValues(new Uint8Array(18))].map(b=>b.toString(16).padStart(2,'0')).join(''));
-const H=()=>({'content-type':'application/json','x-pass':pass,'x-uid':uid,...(LS.gk?{'x-gemini-key':LS.gk}:{}),...(LS.gasUrl?{'x-gas-url':LS.gasUrl,'x-gas-token':gasToken}:{})});
+const H=()=>({'content-type':'application/json','x-pass':pass,'x-uid':uid,...(LS.gk?{'x-gemini-key':LS.gk}:{}),...(LS.gasUrl?{'x-gas-url':LS.gasUrl,'x-gas-token':gasToken}:{}),...(LS.bs?{'x-browser-session':LS.bs}:{})});
 async function api(path,opt={}){const r=await fetch(path,{...opt,headers:H()});if(r.status===401){showPass('合言葉が違います');throw new Error('pass')}return r.json()}
 function showPass(e){$('#passErr').textContent=e||'';passM.classList.add('on');setTimeout(()=>passIn.focus(),50)}
 async function savePass(){pass=passIn.value.trim();try{await api('/api/ping');LS.pass=pass;passM.classList.remove('on');init()}catch{}}
@@ -191,11 +192,11 @@ async function renderList(){try{const l=await api('/api/chats');chatList.innerHT
 async function openChat(id){const m=await api('/api/chats?id='+id);const t=[...chatList.querySelectorAll('.ci')].find(e=>e.onclick.toString().includes(id));chat={id,title:t?t.textContent.replace('✕',''):'会話',messages:m||[]};render();renderList();side.classList.remove('open')}
 async function delChat(id){if(!confirm('この会話を削除しますか？'))return;await api('/api/chats?id='+id,{method:'DELETE'});if(chat&&chat.id===id)newChat();else renderList()}
 async function saveChat(){await api('/api/chats',{method:'POST',body:JSON.stringify(chat)});renderList()}
-const SUGS=['今日のニュースを3つ教えて','明日の予定は？','1週間の夕飯の献立を考えて','ToDoアプリをHTML1枚で作って','Pythonでフォルダ内の画像を一括リサイズしたい','私は朝型でコーヒー好き。覚えておいて'];
+const SUGS=['今日のニュースを3つ教えて','ブラウザでWikipediaを開いて「琵琶湖」を検索して','明日の予定は？','1週間の夕飯の献立を考えて','ToDoアプリをHTML1枚で作って','Pythonでフォルダ内の画像を一括リサイズしたい','私は朝型でコーヒー好き。覚えておいて'];
 function render(){codeStore=[];
   if(!chat.messages.length){wrap.innerHTML=`<div class="empty"><h2>何をしましょう？</h2><div>日常の相談から、調べもの、コーディングまで。</div><div class="sugs">${SUGS.map(s=>`<button onclick="q.value=this.textContent;send()">${s}</button>`).join('')}</div></div>`;return}
   wrap.innerHTML=chat.messages.map(m=>`<div class="m ${m.role==='user'?'user':'ai'}"><div class="b">${m.role==='user'?(m.thumb?`<img src="${m.thumb}">`:'')+esc(m.content):(m.tools||'')+md(m.content)}</div></div>`).join('');msgs.scrollTop=msgs.scrollHeight}
-const TN={web_search:'🔎 検索',fetch_url:'📄 ページを読む',remember:'🧠 記憶',calendar_events:'📅 予定を確認',calendar_create:'📅 予定を追加',gmail_search:'✉️ メール検索',gmail_read:'✉️ メールを読む',gmail_draft:'📝 下書き作成'};
+const TN={web_search:'🔎 検索',fetch_url:'📄 ページを読む',remember:'🧠 記憶',calendar_events:'📅 予定を確認',calendar_create:'📅 予定を追加',gmail_search:'✉️ メール検索',gmail_read:'✉️ メールを読む',gmail_draft:'📝 下書き作成',browser_open:'🌐 開く',browser_click:'🖱️ クリック',browser_type:'⌨️ 入力',browser_scroll:'↕️ スクロール',browser_back:'↩️ 戻る',browser_read:'📖 画面を読む'};
 let att=null; // {full, thumb}
 function resizeImg(file,max,q){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',q))};img.onerror=rej;img.src=URL.createObjectURL(file)})}
 async function pickFile(f){if(!f||!f.type.startsWith('image/'))return;att={full:await resizeImg(f,1280,.85),thumb:await resizeImg(f,320,.7)};attImg.src=att.thumb;attPrev.classList.add('on');q.focus()}
@@ -211,7 +212,7 @@ async function send(){
   chat.messages.push(um);if(chat.title==='新しい会話')chat.title=(text||'画像の質問').slice(0,30);
   render();
   const el=document.createElement('div');el.className='m ai';el.innerHTML='<div class="b"><div class="tl"></div><div class="think"></div><div class="body"><div class="dots"><span></span><span></span><span></span></div></div></div>';wrap.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
-  const tl=el.querySelector('.tl'),th=el.querySelector('.think'),bd=el.querySelector('.body');let tools='';let answer='';let live='';let raf=0;
+  const tl=el.querySelector('.tl'),th=el.querySelector('.think'),bd=el.querySelector('.body');let tools='';let answer='';let live='';let raf=0;let shot='',shotUrl='';const sv=document.createElement('div');sv.className='shotv';tl.after(sv);
   const paint=()=>{raf=0;codeStore=codeStore.slice(0,0);bd.innerHTML=md(live);bd.classList.add('cursor');const nearBottom=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<160;if(nearBottom)msgs.scrollTop=msgs.scrollHeight};
   const payload=chat.messages.map((m,i)=>i===chat.messages.length-1&&img?{...m,image:img.full}:{role:m.role,content:m.content,thumb:m.thumb?1:undefined});
   try{
@@ -223,12 +224,14 @@ async function send(){
         if(ev.type==='thinking'&&!live)th.textContent='💭 考え中…';
         if(ev.type==='delta'){th.textContent='';live+=ev.text;if(!raf)raf=requestAnimationFrame(paint)}
         if(ev.type==='reset'){live='';bd.innerHTML='<div class="dots"><span></span><span></span><span></span></div>'}
-        if(ev.type==='tool'){th.textContent='';let a=ev.args;if(typeof a==='string'){try{a=JSON.parse(a)}catch{}}const d=a&&(a.query||a.url||a.fact||a.title||a.subject||a.start)||'';tools+=`<span class="tool">${TN[ev.name]||ev.name} ${esc(String(d).slice(0,40))}</span>`;tl.innerHTML=tools;msgs.scrollTop=msgs.scrollHeight}
+        if(ev.type==='tool'){th.textContent='';let a=ev.args;if(typeof a==='string'){try{a=JSON.parse(a)}catch{}}const d=a&&(a.query||a.url||a.fact||a.title||a.subject||a.start||a.text||(a.id!=null?'#'+a.id:'')||a.direction)||'';tools+=`<span class="tool">${TN[ev.name]||ev.name} ${esc(String(d).slice(0,40))}</span>`;tl.innerHTML=tools;msgs.scrollTop=msgs.scrollHeight}
+        if(ev.type==='browser_session')LS.bs=ev.id;
+        if(ev.type==='screenshot'){shot=ev.data;shotUrl=ev.url||'';sv.innerHTML=`<div class="shot"><div class="shotbar">🌐 ${esc(shotUrl.slice(0,70))}</div><img src="${shot}" onclick="window.open().document.write('<img src=&quot;'+this.src+'&quot; style=&quot;max-width:100%&quot;>')"></div>`;msgs.scrollTop=msgs.scrollHeight}
         if(ev.type==='text')answer=ev.text;
         if(ev.type==='error')answer='⚠️ エラー: '+ev.message+(LS.gk?'\n\nGeminiキーを確認するか、設定でキーを外すとWorkers AIに切り替わります。':'');
       }}
   }catch(e){answer=answer||live||'⚠️ 通信エラー: '+e.message}
-  chat.messages.push({role:'assistant',content:answer||live,tools:tools?`<div>${tools}</div>`:''});
+  chat.messages.push({role:'assistant',content:answer||live,tools:(tools?`<div>${tools}</div>`:'')+(shot?sv.innerHTML:'')});
   render();busy=false;saveChat();
 }
 q.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
